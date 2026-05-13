@@ -8,9 +8,6 @@ from app.core.config import get_settings
 from app.core.security import decode_access_token
 from app.providers.anthropic_provider import AnthropicProvider
 from app.providers.openai_provider import OpenAIProvider
-from app.services.chat_service import ChatService
-from app.services.circuit_breaker import CircuitBreaker
-from app.services.cost_tracker import CostTracker
 from app.services.user_service import User, get_user
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -48,23 +45,3 @@ def get_openai_provider() -> OpenAIProvider:
 def get_anthropic_provider() -> AnthropicProvider:
     settings = get_settings()
     return AnthropicProvider(api_key=settings.anthropic_api_key, model=settings.anthropic_model)
-
-
-# Default LLM provider for the existing /chat endpoint
-def get_llm_provider() -> OpenAIProvider:
-    return get_openai_provider()
-
-
-@lru_cache
-def get_chat_service() -> ChatService:
-    return ChatService()
-
-
-@lru_cache
-def get_cost_tracker() -> CostTracker:
-    return CostTracker()
-
-
-@lru_cache
-def get_circuit_breaker() -> CircuitBreaker:
-    return CircuitBreaker(failure_threshold=5, recovery_timeout=60)

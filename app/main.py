@@ -4,30 +4,16 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from slowapi.errors import RateLimitExceeded
 
 from app.core.config import get_settings
 from app.core.logging import setup_logging
 from app.core.middleware import LoggingMiddleware, RequestIDMiddleware
-from app.routers import auth, chat, users
-from app.routers import cached_chat
-from app.routers.chat import limiter
+from app.routers import auth, users, cached_chat
 
 logger = logging.getLogger(__name__)
 
 _settings = get_settings()
-
-
-async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
-    return JSONResponse(
-        status_code=429,
-        content={
-            "error": "rate_limit_exceeded",
-            "detail": "Too many requests. Max is 10 per minute per IP.",
-        },
-    )
 
 
 @asynccontextmanager
@@ -38,20 +24,19 @@ async def lifespan(app: FastAPI):
     if not settings.jwt_secret_key:
         raise RuntimeError("JWT_SECRET_KEY is not configured")
 
-    app.state.ai_enabled = bool(settings.openai_api_key)
-    app.state.anthropic_enabled = bool(settings.anthropic_api_key)
+    openai_ready = bool(settings.openai_api_key)
+    anthropic_ready = bool(settings.anthropic_api_key)
 
-    if not app.state.ai_enabled:
+    if not openai_ready:
         logger.warning("startup_no_openai_key", extra={"event": "startup_no_openai_key"})
-    if not app.state.anthropic_enabled:
+    if not anthropic_ready:
         logger.warning("startup_no_anthropic_key", extra={"event": "startup_no_anthropic_key"})
 
     logger.info("startup", extra={
         "event": "startup",
         "environment": settings.environment,
-        "model": settings.default_model,
-        "ai_enabled": app.state.ai_enabled,
-        "anthropic_enabled": app.state.anthropic_enabled,
+        "openai_ready": openai_ready,
+        "anthropic_ready": anthropic_ready,
     })
     yield
     logger.info("shutdown", extra={"event": "shutdown"})
@@ -78,25 +63,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
-
 app.add_middleware(LoggingMiddleware)
 app.add_middleware(RequestIDMiddleware)
 
 app.include_router(auth.router)
 app.include_router(users.router)
-app.include_router(chat.router)
 app.include_router(cached_chat.router)
 
 
 @app.get("/health", tags=["ops"])
-async def health(request: Request) -> dict:
-    return {
-        "status": "ok",
-        "ai_enabled": request.app.state.ai_enabled,
-        "anthropic_enabled": request.app.state.anthropic_enabled,
-    }
+async def health() -> dict:
+    return {"status": "ok"}
 
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

@@ -1,7 +1,6 @@
 import logging
 
-from fastapi import HTTPException
-from openai import OpenAI, OpenAIError
+from openai import OpenAI
 
 from app.core.retry import retry_llm
 from app.providers.base import LLMProvider
@@ -13,20 +12,6 @@ class OpenAIProvider(LLMProvider):
     def __init__(self, api_key: str, model: str) -> None:
         self._client = OpenAI(api_key=api_key)
         self._model = model
-
-    def chat(self, messages: list[dict]) -> tuple[str, int]:
-        """Standard chat for ChatService compatibility."""
-        try:
-            response = self._client.chat.completions.create(
-                model=self._model,
-                messages=messages,
-            )
-        except OpenAIError as e:
-            raise HTTPException(status_code=502, detail=f"OpenAI error: {e}")
-
-        reply = response.choices[0].message.content or ""
-        tokens_used = response.usage.total_tokens if response.usage else len(reply.split())
-        return reply, tokens_used
 
     @retry_llm
     def generate(self, system_prompt: str, user_message: str) -> tuple[str, int, int, int]:

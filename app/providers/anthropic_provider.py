@@ -1,7 +1,6 @@
 import logging
 
 import anthropic
-from fastapi import HTTPException
 
 from app.core.retry import retry_llm
 from app.providers.base import LLMProvider
@@ -13,22 +12,6 @@ class AnthropicProvider(LLMProvider):
     def __init__(self, api_key: str, model: str) -> None:
         self._client = anthropic.Anthropic(api_key=api_key)
         self._model = model
-
-    def chat(self, messages: list[dict]) -> tuple[str, int]:
-        """Standard chat for ChatService compatibility — no cache_control."""
-        try:
-            response = self._client.messages.create(
-                model=self._model,
-                max_tokens=1024,
-                messages=[m for m in messages if m["role"] != "system"],
-                system=next((m["content"] for m in messages if m["role"] == "system"), ""),
-            )
-        except anthropic.APIError as e:
-            raise HTTPException(status_code=502, detail=f"Anthropic error: {e}")
-
-        reply = response.content[0].text if response.content else ""
-        tokens_used = response.usage.input_tokens + response.usage.output_tokens
-        return reply, tokens_used
 
     @retry_llm
     def generate(self, system_prompt: str, user_message: str) -> tuple[str, int, int, int]:
