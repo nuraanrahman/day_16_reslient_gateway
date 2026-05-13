@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+openai
+anthropic
+python-dotenv
+slowapi
+python-jose[cryptography]
+bcrypt
+python-multipart
+aiofiles
+requests
+tenacity
